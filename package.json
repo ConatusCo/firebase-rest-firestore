@@ -1,7 +1,7 @@
 {
-  "name": "firebase-rest-firestore",
-  "version": "1.6.0",
-  "description": "Firebase Firestore REST API client for Edge runtime environments",
+  "name": "@conatusco/firebase-rest-firestore",
+  "version": "1.6.1",
+  "description": "Fork of firebase-rest-firestore with the createWithId emulator auth-header fix (upstream PR nabettu/firebase-rest-firestore#10)",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/types/index.d.ts",
@@ -9,6 +9,10 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
   "scripts": {
     "build": "npm run build:esm && npm run build:cjs && npm run build:types",
     "build:esm": "tsc -p tsconfig.esm.json",
@@ -57,7 +61,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nabettu/firebase-rest-firestore.git"
+    "url": "git+https://github.com/ConatusCo/firebase-rest-firestore.git"
   },
   "bugs": {
     "url": "https://github.com/nabettu/firebase-rest-firestore/issues"
