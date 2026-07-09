@@ -134,8 +134,22 @@ export interface FieldTransform {
  */
 export interface CommitWrite {
   update: { name: string; fields: Record<string, FirestoreFieldValue> };
+  updateMask?: { fieldPaths: string[] };
   updateTransforms?: FieldTransform[];
   currentDocument?: { exists?: boolean; updateTime?: string };
+}
+
+/**
+ * A single document write in a `batchWrite` call.
+ */
+export interface BatchWriteItem {
+  /** Document path, ex: "users/uid/posts/postId" */
+  path: string;
+  data: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** Merge into the existing document (top-level fields) instead of replacing it. */
+  merge?: boolean;
+  /** Precondition, ex: `{ exists: false }` to fail if the document already exists. */
+  precondition?: { exists?: boolean; updateTime?: string };
 }
 
 /**

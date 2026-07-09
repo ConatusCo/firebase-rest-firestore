@@ -143,7 +143,7 @@ function isPlainObject(value: any): boolean {
  * a path separator.
  * See: https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents#Document
  */
-function escapeFieldPathSegment(segment: string): string {
+export function escapeFieldPathSegment(segment: string): string {
   if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(segment)) {
     return segment;
   }
@@ -193,23 +193,28 @@ export function extractFieldTransforms(
 
 /**
  * Build a single `documents:commit` write that updates a document and applies
- * field transforms. `updateTransforms` / `currentDocument` are only included
- * when relevant.
+ * field transforms. `updateMask` / `updateTransforms` / `currentDocument` are
+ * only included when relevant.
  *
  * @param documentName Full resource name (projects/.../documents/<path>)
  * @param fields Already-converted Firestore field values
  * @param transforms Field transforms to apply after the update
  * @param currentDocument Optional precondition (e.g. `{ exists: false }`)
+ * @param updateMask Optional field paths to patch; omit to replace the document
  */
 export function buildCommitWrite(
   documentName: string,
   fields: Record<string, FirestoreFieldValue>,
   transforms: FieldTransform[],
-  currentDocument?: { exists?: boolean; updateTime?: string }
+  currentDocument?: { exists?: boolean; updateTime?: string },
+  updateMask?: { fieldPaths: string[] }
 ): CommitWrite {
   const write: CommitWrite = {
     update: { name: documentName, fields },
   };
+  if (updateMask) {
+    write.updateMask = updateMask;
+  }
   if (transforms.length > 0) {
     write.updateTransforms = transforms;
   }

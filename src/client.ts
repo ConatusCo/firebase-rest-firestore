@@ -5,9 +5,10 @@ import {
   convertFromFirestoreDocument,
   convertToFirestoreDocument,
   convertToFirestoreValue,
+  escapeFieldPathSegment,
   extractFieldTransforms,
 } from "./utils/converter";
-import { FieldTransform } from "./types";
+import { BatchWriteItem, CommitWrite, FieldTransform } from "./types";
 import { getFirestoreBasePath } from "./utils/path";
 import { formatPrivateKey } from "./utils/config";
 import { FirestorePath, createFirestorePath } from "./utils/path";
@@ -166,23 +167,32 @@ export class FirestoreClient {
     const documentName = this.pathUtil.getParentReference(
       `${collectionName}/${documentId}`
     );
-    const write = buildCommitWrite(
-      documentName,
-      fields,
-      transforms,
-      currentDocument
-    );
+    await this.commitWrites([
+      buildCommitWrite(documentName, fields, transforms, currentDocument),
+    ]);
+  }
+
+  /**
+   * POST a set of writes to `documents:commit`. Firestore applies all writes in
+   * one request atomically, and rejects a request containing more than 500
+   * writes or two writes to the same document.
+   * @private
+   */
+  private async commitWrites(writes: CommitWrite[]): Promise<void> {
     const url = `${this.pathUtil.getBasePath()}:commit`;
 
     if (this.debug) {
-      console.log(`Committing write to: ${url}`, JSON.stringify(write));
+      console.log(
+        `Committing ${writes.length} write(s) to: ${url}`,
+        JSON.stringify(writes)
+      );
     }
 
     const headers = await this.prepareHeaders();
     const response = await fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ writes: [write] }),
+      body: JSON.stringify({ writes }),
     });
 
     if (!response.ok) {
@@ -200,6 +210,48 @@ export class FirestoreClient {
         response.status === 409 || /ALREADY_EXISTS/.test(errorText);
       throw error;
     }
+  }
+
+  /**
+   * Write many documents through the `documents:commit` endpoint.
+   *
+   * Each item is one write: `merge` patches the listed top-level fields
+   * (leaving the rest of the document untouched) instead of replacing the
+   * document, and `precondition` guards it (e.g. `{ exists: false }` to fail if
+   * the document is already there). Field transforms such as
+   * `FieldValue.serverTimestamp()` are supported.
+   *
+   * Firestore rejects two writes to the same document in one commit, so callers
+   * must de-duplicate `path` beforehand.
+   *
+   * @param items Documents to write
+   */
+  async batchWrite(items: BatchWriteItem[]): Promise<void> {
+    this.checkConfig();
+    if (items.length === 0) return;
+
+    const writes = items.map(({ path, data, merge, precondition }) => {
+      const { fields: plainData, transforms } = extractFieldTransforms(data);
+      const { fields } = convertToFirestoreDocument(plainData);
+      return buildCommitWrite(
+        this.pathUtil.getParentReference(path),
+        fields,
+        transforms,
+        precondition,
+        merge
+          ? { fieldPaths: Object.keys(plainData).map(escapeFieldPathSegment) }
+          : undefined
+      );
+    });
+
+    // ponytail: chunks are committed in parallel, so a >500-write batch is
+    // atomic per chunk, not overall. Sequence them if that ever matters.
+    const MAX_WRITES_PER_COMMIT = 500;
+    const chunks: CommitWrite[][] = [];
+    for (let i = 0; i < writes.length; i += MAX_WRITES_PER_COMMIT) {
+      chunks.push(writes.slice(i, i + MAX_WRITES_PER_COMMIT));
+    }
+    await Promise.all(chunks.map(chunk => this.commitWrites(chunk)));
   }
 
   /**
