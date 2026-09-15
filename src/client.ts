@@ -5,6 +5,7 @@ import {
   convertFromFirestoreDocument,
   convertToFirestoreDocument,
   convertToFirestoreValue,
+  escapeFieldPath,
   escapeFieldPathSegment,
   extractFieldTransforms,
 } from "./utils/converter";
@@ -715,7 +716,7 @@ export class FirestoreClient {
 
           requestBody.structuredQuery.where = {
             fieldFilter: {
-              field: { fieldPath: filter.field },
+              field: { fieldPath: escapeFieldPath(filter.field) },
               op: firestoreOp,
               value: convertToFirestoreValue(filter.value),
             },
@@ -730,7 +731,7 @@ export class FirestoreClient {
                 const firestoreOp = opMap[filter.op] || filter.op;
                 return {
                   fieldFilter: {
-                    field: { fieldPath: filter.field },
+                    field: { fieldPath: escapeFieldPath(filter.field) },
                     op: firestoreOp,
                     value: convertToFirestoreValue(filter.value),
                   },
@@ -745,7 +746,7 @@ export class FirestoreClient {
       if (options.orderBy) {
         requestBody.structuredQuery.orderBy = [
           {
-            field: { fieldPath: options.orderBy },
+            field: { fieldPath: escapeFieldPath(options.orderBy) },
             direction: options.orderDirection || "ASCENDING",
           },
         ];

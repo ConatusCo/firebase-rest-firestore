@@ -151,6 +151,36 @@ export function escapeFieldPathSegment(segment: string): string {
 }
 
 /**
+ * Escape a dotted field path for a structured query (`where` / `orderBy`).
+ * Splits on dots outside backticks and escapes each segment with
+ * {@link escapeFieldPathSegment}. Segments that are already backtick-quoted are
+ * kept as-is, so a pre-escaped path such as "`@type`" still works.
+ */
+export function escapeFieldPath(path: string): string {
+  const segments: string[] = [];
+  let current = "";
+  let quoted = false;
+  for (let i = 0; i < path.length; i++) {
+    const char = path[i];
+    if (quoted && char === "\\" && i + 1 < path.length) {
+      current += char + path[++i];
+    } else if (char === "." && !quoted) {
+      segments.push(current);
+      current = "";
+    } else {
+      if (char === "`") quoted = !quoted;
+      current += char;
+    }
+  }
+  segments.push(current);
+  return segments
+    .map(segment =>
+      /^`(?:[^`\\]|\\.)*`$/.test(segment) ? segment : escapeFieldPathSegment(segment)
+    )
+    .join(".");
+}
+
+/**
  * Split write data into plain field values and Firestore field transforms.
  *
  * `FieldValue` sentinels (e.g. `serverTimestamp()`) are pulled out into
